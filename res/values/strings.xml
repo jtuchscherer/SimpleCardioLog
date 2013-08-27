@@ -12,7 +12,7 @@
     <string name="save_exercise">Save</string>
     <string name="empty_exercise_list">No exercises found</string>
     <string name="error_cannot_save_exercises">Unable to save exercises, SD card not mounted or unwritable.</string>
-    <string name="error_cannot_save_muscles">Unable to save muscle group data, SD card not mounted or unwritable.</string>
+    <string name="error_cannot_save_units">Unable to save units data, SD card not mounted or unwritable.</string>
     <string name="error_cannot_save_log">Unable to save log, SD card not mounted or unwritable.</string>
     <string name="title_exercise_list">Simple Strength Log</string>
     <string name="title_activity_log">Log</string>
@@ -34,19 +34,17 @@
     <string name="addFavoriteCheckBoxLabel">Favorite</string>
     <string name="doneCheckMark">✓</string>
     
-    <string-array name="unit_array">
-        <item>Miles</item>
-        <item>Stairs</item>
-        <item>Kilometers</item>
-        <item>Floors</item>
-        <item>Custom&#8230;</item>
-    </string-array>
-    
     <string-array name="precision_array">
-        <item>0.01</item>
-        <item>0.1</item>
+        <item>.01</item>
+        <item>.1</item>
         <item>1</item>
         <item>10</item>
     </string-array>
+    
+        <string name="measurementUnitLabel">Measures Units</string>
+        <string name="measurementUnitlessLabel">Unitless</string>
+        <string name="measurementPrecisionLabel">Measurement Precision:</string>
+        <string name="measurementUnitsLabel">Measurement Units:</string>
+        <string name="save_log_entry">Save Entry</string>
 
 </resources>

@@ -53,9 +53,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.AdapterView.AdapterContextMenuInfo;
 
-
+//TODO: custom unit
 //TODO: unit list comes from file.  like everything else, defaulted.  as you add custom, they get added to it
 //TODO: if editing, and exercise has unit not in list, add it to list, mark as dirty (this is in case someone hand edits)
+//TODO: when adding custom make sure its not there already
 
 public class ExerciseList extends ListActivity {
 
@@ -168,9 +169,9 @@ public class ExerciseList extends ListActivity {
 	    		this.exerciseAdapter.notifyDataSetChanged();
 	    		return true;
 	    	case R.id.editContextMenu :
-//	    		Intent intent = new Intent(this, AddActivity.class);
-//				intent.putExtra("exercise", selectedExercise);
-//				startActivityForResult(intent, EDIT_EXERCISE_REQUEST);
+	    		Intent intent = new Intent(this, AddActivity.class);
+				intent.putExtra("exercise", selectedExercise);
+				startActivityForResult(intent, EDIT_EXERCISE_REQUEST);
 				return true;
 	    }
 	    return false;
@@ -202,7 +203,7 @@ public class ExerciseList extends ListActivity {
 		for(CardioExercise exercise: allExercises) {
 			if(exercise.name.equals(editedExercise.name)) {
 				//Modify the existing one, because there might be handles to it elsewhere
-//				exercise.copyFrom(editedExercise);
+				exercise.copyFrom(editedExercise);
 				this.dirty = true;
 				saveExercises();
 				this.displayExercises();
@@ -226,9 +227,9 @@ public class ExerciseList extends ListActivity {
 	}
 	
 	private void logExercise(CardioExercise exercise) {
-//		Intent intent = new Intent(ExerciseList.this, LogActivity.class);
-//		intent.putExtra("exercise", exercise);
-//		startActivity(intent);
+		Intent intent = new Intent(ExerciseList.this, LogActivity.class);
+		intent.putExtra("exercise", exercise);
+		startActivity(intent);
 	}
 	
 	private void deleteExercise(final CardioExercise exercise) {
@@ -306,6 +307,8 @@ public class ExerciseList extends ListActivity {
 			CheckBox favoriteCheckBox = (CheckBox) row.findViewById(R.id.favoriteCheckbox);
 			favoriteCheckBox.setChecked(item.favorite);
 			favoriteCheckBox.setOnClickListener(toggleFavoriteListener);
+			
+			Log.i("EL", item.toString());
 			
 			return row;
 		}

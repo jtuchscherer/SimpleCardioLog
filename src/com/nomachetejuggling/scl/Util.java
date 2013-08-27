@@ -46,6 +46,15 @@ public class Util {
 		}
 		return new File(myDir, "exerciselist.json");
 	}
+	
+	public static File getUnitsFile(Context context) {
+		File dir = Environment.getExternalStorageDirectory();
+		File myDir = new File(dir, "/SimpleHealthSuite/Cardio");
+		if (!myDir.mkdirs()) {
+			Log.w("Util", "Directory not created");
+		}
+		return new File(myDir, "units.json");
+	}
 
 	public static String getRelativeDate(LocalDate today, LocalDate previousDate) {
 		//These calculations are relatively expensive, so we'll only do the ones we absolutely need to
@@ -80,6 +89,29 @@ public class Util {
 		}
 	}
 
+	public static String[] loadUnits(Context context) {
+		File file = Util.getUnitsFile(context);
+		Gson gson = new GsonBuilder().setPrettyPrinting().create();
+		String[] units = new String[]{};
+		try {
+			String json = FileUtils.readFileToString(file, "UTF-8");
+			units = gson.fromJson(json, String[].class);
+		
+		} catch(IOException e) { //File missing or unreadable, load defaults (and save them if possible)
+			try {
+				InputStream stream = context.getResources().openRawResource(R.raw.units_default);
+				String json = IOUtils.toString(stream, "UTF-8");		
+			
+				units = gson.fromJson(json, String[].class);
+				FileUtils.write(file, json, "UTF-8");
+			} catch (IOException ioe) {
+				Toast.makeText(context, context.getString(R.string.error_cannot_save_units), Toast.LENGTH_SHORT).show();
+			}
+		}
+		
+		return units;
+	}
+	
 	
 	public static String join(String[] s, String separator, String ifEmpty)
 	{

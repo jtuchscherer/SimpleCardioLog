@@ -3,10 +3,10 @@
     package="com.nomachetejuggling.scl"
     android:versionCode="1"
     android:versionName="1.0" >
-    
+
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    
+
     <uses-sdk
         android:minSdkVersion="14"
         android:targetSdkVersion="18" />
@@ -28,7 +28,15 @@
         <activity
             android:name="com.nomachetejuggling.scl.AddActivity"
             android:label="@string/title_activity_add"
-            android:parentActivityName="com.nomachetejuggling.scl.ExerciseList">
+            android:parentActivityName="com.nomachetejuggling.scl.ExerciseList" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.nomachetejuggling.scl.ExerciseList" />
+        </activity>
+        <activity
+            android:name="com.nomachetejuggling.scl.LogActivity"
+            android:label="@string/title_activity_log"
+            android:parentActivityName="com.nomachetejuggling.scl.ExerciseList" >
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.nomachetejuggling.scl.ExerciseList" />

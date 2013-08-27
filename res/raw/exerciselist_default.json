@@ -1,0 +1,39 @@
+[
+  {
+    "name": "Treadmill",
+    "unitName": "Miles",
+    "unitAbbrev": "mi",
+    "precision": 0.01
+  },
+  {
+    "name": "Elliptical",
+    "unitName": "Miles",
+    "unitAbbrev": "mi",
+    "precision": 0.1
+  },
+  {
+    "name": "Stair Climber",
+    "unitName": "Floors",
+    "unitAbbrev": "fl",
+    "precision": 1
+  },
+  {
+    "name": "Rowing Machine",
+    "unitName": "Kilometers",
+    "unitAbbrev": "km",
+    "precision": 0.01
+  },
+  {
+    "name": "Cycling",
+    "unitName": "Miles",
+    "unitAbbrev": "mi",
+    "precision": 0.1
+  },
+  {
+    "name": "Skiing",
+    "unitName": "Miles",
+    "unitAbbrev": "mi",
+    "precision": 10
+  }
+
+]

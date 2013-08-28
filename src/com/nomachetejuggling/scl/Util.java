@@ -82,7 +82,7 @@ public class Util {
 					} else if (days == 1) {
 						return "Yesterday";
 					} else {
-						return "Previously";
+						return "Today";
 					}
 				}
 			}

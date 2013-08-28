@@ -30,4 +30,8 @@ public class CardioExercise implements Serializable, Comparable<CardioExercise> 
 		this.units = other.units;
 		this.precision = other.precision;
 	}
+
+	public boolean isUnitless() {
+		return units == null || units.equals(UNITLESS);
+	}
 }

@@ -46,5 +46,9 @@
         <string name="measurementPrecisionLabel">Measurement Precision:</string>
         <string name="measurementUnitsLabel">Measurement Units:</string>
         <string name="save_log_entry">Save Entry</string>
+        <string name="minutes_label">Minutes</string>
+        <string name="minutesLabel">Minutes</string>
+        <string name="unitsLabelText">Units</string>
+        <string name="caloriesLabelText">Calories</string>
 
 </resources>

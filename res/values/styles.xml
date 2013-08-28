@@ -34,4 +34,5 @@
         <item name="android:textColor">@color/actionbar_color</item>
     </style>
 
+
 </resources>

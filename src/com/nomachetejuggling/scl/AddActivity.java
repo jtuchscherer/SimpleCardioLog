@@ -94,7 +94,7 @@ public class AddActivity extends Activity {
 			
 		});
 		
-		if(getIntent().getExtras().containsKey("exercise")) { //Edit
+		if(getIntent() != null && getIntent().getExtras() != null && getIntent().getExtras().containsKey("exercise")) { //Edit
 			CardioExercise exercise = (CardioExercise) getIntent().getExtras().getSerializable("exercise");
 			
 			EditText nameText = (EditText) findViewById(R.id.nameText);

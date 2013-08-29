@@ -4,6 +4,8 @@
     <color name="actionbar_background">#1a2e79</color>
     <color name="actionbar_color">#ffffff</color>
     <color name="dimmed_text">#888888</color>
+    <color name="divider">#1a2e79</color>
+    <color name="logButtonBackground">#101a2e79</color>
     <color name="currentLogEntry">#b3aaaa</color>
     <color name="checkMark">#229922</color>
 </resources>

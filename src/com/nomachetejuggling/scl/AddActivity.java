@@ -181,7 +181,7 @@ public class AddActivity extends Activity {
 		
 		if(valid) {
 			CardioExercise newExercise = new CardioExercise();
-			newExercise.name=nameText.getText().toString();
+			newExercise.name=nameText.getText().toString().trim();
 			newExercise.favorite = favoriteCheckBox.isChecked();
 			newExercise.units = (String)measurementUnitSpinner.getSelectedItem();
 			

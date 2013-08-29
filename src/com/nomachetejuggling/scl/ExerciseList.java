@@ -53,10 +53,14 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.AdapterView.AdapterContextMenuInfo;
 
-//TODO: custom unit
-//TODO: unit list comes from file.  like everything else, defaulted.  as you add custom, they get added to it
-//TODO: if editing, and exercise has unit not in list, add it to list, mark as dirty (this is in case someone hand edits)
-//TODO: when adding custom make sure its not there already
+//TODO: general cleanup, hardening (code is hacked up)
+//TODO: regression off however many points we have, not just 5.  At least 2. (3?)
+//TODO: horizontal and tablet layouts for logging
+//TODO: dropdown for filter/favorites
+//TODO: are there any settings to save?
+//TODO: random uses displayExercises, not All
+//TODO: don't allow save/scroll until data load is done
+//TODO: proper display when no exercises present
 
 public class ExerciseList extends ListActivity {
 
@@ -134,6 +138,20 @@ public class ExerciseList extends ListActivity {
 			Intent intent = new Intent(this, AddActivity.class);
 			startActivityForResult(intent, ADD_EXERCISE_REQUEST);
 			return true;
+		case R.id.random_exercise:
+			if(allExercises.size() == 0) {
+				new AlertDialog.Builder(this)
+					.setMessage("No exercises!")
+					.setCancelable(false)
+					.setPositiveButton(R.string.okay,new DialogInterface.OnClickListener() {
+		                public void onClick(DialogInterface dialog,int id) {
+		                    dialog.cancel();
+		                }
+					}).create().show();
+			} else {
+				CardioExercise selected = allExercises.get((int)(allExercises.size()*Math.random()));
+				logExercise(selected);
+			}
 		case R.id.action_settings:
 //			startActivity(new Intent(this, SettingsActivity.class));
 			return true;
@@ -220,10 +238,25 @@ public class ExerciseList extends ListActivity {
 	}
 	
 	private void addExercise(CardioExercise newExercise) {
+		int copyVal = 1;
+		String originalName = newExercise.name;
+		while(exercisesContain(newExercise)) {
+			copyVal++;
+			newExercise.name = originalName+" ("+copyVal+")"; 
+		}
 		allExercises.add(newExercise);
 		displayExercises();
 		dirty = true;
 		saveExercises();
+	}
+	
+	private boolean exercisesContain(CardioExercise exercise) {
+		for(CardioExercise ce: allExercises) {
+			if(ce.name.equals(exercise.name)) {
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	private void logExercise(CardioExercise exercise) {
@@ -307,8 +340,6 @@ public class ExerciseList extends ListActivity {
 			CheckBox favoriteCheckBox = (CheckBox) row.findViewById(R.id.favoriteCheckbox);
 			favoriteCheckBox.setChecked(item.favorite);
 			favoriteCheckBox.setOnClickListener(toggleFavoriteListener);
-			
-			Log.i("EL", item.toString());
 			
 			return row;
 		}

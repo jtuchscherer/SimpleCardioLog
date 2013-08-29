@@ -8,8 +8,14 @@
        
     <item
         android:id="@+id/add_exercise"
-        android:icon="@android:drawable/ic_menu_add"
-        android:showAsAction="ifRoom"
+        android:icon="@drawable/ic_action_add"
+        android:showAsAction="always"
         android:title="@string/add_exercise"/>
+    
+        <item
+        android:id="@+id/random_exercise"
+        android:icon="@drawable/ic_action_dice"
+        android:showAsAction="ifRoom"
+        android:title="@string/random_exercise"/>
 
 </menu>

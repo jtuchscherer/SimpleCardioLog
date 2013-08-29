@@ -19,30 +19,9 @@
             android:layout_weight="2" />
 
         <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_marginRight="@dimen/spinner_horizontal_margin"
-            android:orientation="vertical" >
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="@string/minutesLabel"
-                android:textAppearance="?android:attr/textAppearanceSmall" />
-
-            <NumberPicker
-                android:id="@+id/minutesPicker"
-                android:layout_width="wrap_content"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
-        </LinearLayout>
-
-        <LinearLayout
             android:id="@+id/unitSelection"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_marginLeft="@dimen/spinner_horizontal_margin"
             android:layout_marginRight="@dimen/spinner_horizontal_margin"
             android:orientation="vertical" >
 
@@ -57,6 +36,27 @@
 
             <NumberPicker
                 android:id="@+id/unitPicker"
+                android:layout_width="wrap_content"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginLeft="@dimen/spinner_horizontal_margin"
+            android:layout_marginRight="@dimen/spinner_horizontal_margin"
+            android:orientation="vertical" >
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="@string/minutesLabel"
+                android:textAppearance="?android:attr/textAppearanceSmall" />
+
+            <NumberPicker
+                android:id="@+id/minutesPicker"
                 android:layout_width="wrap_content"
                 android:layout_height="0dp"
                 android:layout_weight="1" />
@@ -94,6 +94,7 @@
         android:background="@color/divider" />
 
     <LinearLayout
+        android:id="@+id/buttonBar"
         style="?android:attr/buttonBarStyle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -105,17 +106,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:onClick="clickLogSet"
             android:text="@string/saveButton" />
-
-<!--         <Button
-            android:id="@+id/saveAndRestButton"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="2"
-            android:onClick="clickLogSetAndRest"
-            android:text="@string/saveAndRestButtonLabel" /> -->
 
         <Button
             android:id="@+id/undoButton"
@@ -124,7 +115,6 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:enabled="false"
-            android:onClick="clickUndo"
             android:text="@string/undoButtonLabel" />
     </LinearLayout>
 
@@ -178,9 +168,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />
             </ScrollView>
-
         </LinearLayout>
-
     </FrameLayout>
 
 </LinearLayout>

@@ -1,9 +1,8 @@
 package com.nomachetejuggling.scl.model;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
 
-public class CardioExercise implements Serializable, Comparable<CardioExercise> {
+public class Exercise implements Serializable, Comparable<Exercise> {
 	public static final String UNITLESS="None";
 	
 	private static final long serialVersionUID = -848012361823465720L;
@@ -20,11 +19,11 @@ public class CardioExercise implements Serializable, Comparable<CardioExercise> 
 	}
 
 	@Override
-	public int compareTo(CardioExercise other) {
+	public int compareTo(Exercise other) {
 		return name.trim().compareToIgnoreCase(other.name.trim());
 	}
 
-	public void copyFrom(CardioExercise other) {
+	public void copyFrom(Exercise other) {
 		this.name = other.name;
 		this.favorite = other.favorite;
 		this.units = other.units;

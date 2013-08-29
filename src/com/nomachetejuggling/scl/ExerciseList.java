@@ -19,14 +19,13 @@ import org.joda.time.LocalDate;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
-import com.nomachetejuggling.scl.model.CardioExercise;
-import com.nomachetejuggling.scl.model.CardioLogEntry;
+import com.nomachetejuggling.scl.model.Exercise;
+import com.nomachetejuggling.scl.model.LogEntry;
 
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.app.ActionBar;
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ListActivity;
 import android.content.Context;
@@ -53,51 +52,73 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.AdapterView.AdapterContextMenuInfo;
 
-//TODO: general cleanup, hardening (code is hacked up)
-//TODO: regression off however many points we have, not just 5.  At least 2. (3?)
-//TODO: horizontal and tablet layouts for logging
 //TODO: dropdown for filter/favorites
-//TODO: are there any settings to save?
 //TODO: random uses displayExercises, not All
-//TODO: don't allow save/scroll until data load is done
+//TODO: some kind of feature to see how many calories burned each day, a history.  useful here
 //TODO: proper display when no exercises present
+//TODO: default cardio file
 
-public class ExerciseList extends ListActivity {
+public class ExerciseList extends ListActivity implements ActionBar.OnNavigationListener{
 
 	private ExerciseAdapter exerciseAdapter;
-	private ArrayList<CardioExercise> allExercises;
+	private ArrayList<Exercise> allExercises;
+	private ArrayList<Exercise> displayExercises;
 	private boolean dirty;
-	public Set<String> doneExercices = new HashSet<String>();
-	private boolean loaded = false;
+	private boolean loaded;
+	private Set<String> doneExercises;
+	private String filter;
 
 	private static final int ADD_EXERCISE_REQUEST = 0;
 	private static final int EDIT_EXERCISE_REQUEST = 1;
-
+	
+	private ArrayList<String> itemList;
+	private ActionBarNavigationAdapter aAdpt;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);		
-		Log.i("ELA", "Create");
 		setContentView(R.layout.activity_exercise_list);
 				
 		getListView().setVisibility(View.INVISIBLE);
 		findViewById(R.id.linlaHeaderProgress).setVisibility(View.VISIBLE);
 		
-		allExercises = new ArrayList<CardioExercise>();
+		allExercises = new ArrayList<Exercise>();
+		displayExercises = new ArrayList<Exercise>();
 		dirty = false;
+		loaded = false;
+		doneExercises = new HashSet<String>();
 		
-		exerciseAdapter = new ExerciseAdapter(this, R.layout.list_exercises, R.id.line1, allExercises);
+		exerciseAdapter = new ExerciseAdapter(this, R.layout.list_exercises, R.id.line1, displayExercises);
 		setListAdapter(exerciseAdapter);
 		
-		registerForContextMenu(getListView());					
+		registerForContextMenu(getListView());	
+		
+		SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(this);
+		if(settings.contains("filter")){
+			filter = settings.getString("filter", "All");
+		} else {
+			filter = "All";
+		}
+		
+		itemList = new ArrayList<String>();
+		itemList.add("All");
+		itemList.add("Favorites");
+		
+		aAdpt = new ActionBarNavigationAdapter(this,itemList);	
+	
 	}	
 	
+
 	@Override
 	public void onStart() {
 		super.onStart();
-		Log.i("ELA", "Start");
+		final ActionBar actionBar = getActionBar();
+		actionBar.setDisplayShowTitleEnabled(false);
+		actionBar.setNavigationMode(ActionBar.NAVIGATION_MODE_LIST);		
+		actionBar.setListNavigationCallbacks(aAdpt, this);
+		actionBar.setSelectedNavigationItem(itemList.indexOf(filter));
 		
-		new LoadListData(this).execute(new LoadListData.Input());
+		new LoadListData(this).execute();
 	}
 
 	@Override
@@ -107,9 +128,23 @@ public class ExerciseList extends ListActivity {
 	}
 	
 	@Override
+	protected void onPause() 
+	{
+	  super.onPause();
+	  
+	  // Store values between instances here
+	  SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(this);
+	  
+	  SharedPreferences.Editor editor = settings.edit();  // Put the values from the UI
+	  
+	  editor.putString("filter", filter); // value to store    
+	  editor.commit();
+	}
+	
+	@Override
 	public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
 		AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
-		CardioExercise selectedExercise = ((ExerciseAdapter)this.getListAdapter()).getItem(info.position);
+		Exercise selectedExercise = ((ExerciseAdapter)this.getListAdapter()).getItem(info.position);
 
 	    menu.setHeaderTitle(selectedExercise.name);
 		
@@ -132,6 +167,13 @@ public class ExerciseList extends ListActivity {
 	}
 	
 	@Override
+	public boolean onNavigationItemSelected(int position, long id) {
+		this.filter = itemList.get(position);
+		displayExercises();
+		return true;
+	}
+	
+	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
 		switch (item.getItemId()) {
 		case R.id.add_exercise:
@@ -139,21 +181,37 @@ public class ExerciseList extends ListActivity {
 			startActivityForResult(intent, ADD_EXERCISE_REQUEST);
 			return true;
 		case R.id.random_exercise:
-			if(allExercises.size() == 0) {
+			List<Exercise> possibleExercises = new ArrayList<Exercise>();
+			
+			SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(this);
+			boolean randomIncludeDone = settings.getBoolean("randomIncludeDone", false);
+			if(randomIncludeDone) {
+				possibleExercises.addAll(allExercises);
+			} else {
+				for(Exercise exercise: allExercises) {
+					if(!doneExercises.contains(exercise.name)) {
+						possibleExercises.add(exercise);
+					}
+				}
+			} 
+			
+			if(possibleExercises.size() == 0) {
 				new AlertDialog.Builder(this)
-					.setMessage("No exercises!")
+					.setTitle(getString(R.string.noExercisesTitle))
+					.setMessage(getString(R.string.noExercisesMessage))
 					.setCancelable(false)
-					.setPositiveButton(R.string.okay,new DialogInterface.OnClickListener() {
+					.setPositiveButton(android.R.string.ok,new DialogInterface.OnClickListener() {
 		                public void onClick(DialogInterface dialog,int id) {
 		                    dialog.cancel();
 		                }
 					}).create().show();
 			} else {
-				CardioExercise selected = allExercises.get((int)(allExercises.size()*Math.random()));
+				Exercise selected = possibleExercises.get((int)(possibleExercises.size()*Math.random()));
 				logExercise(selected);
 			}
+			return true;
 		case R.id.action_settings:
-//			startActivity(new Intent(this, SettingsActivity.class));
+			startActivity(new Intent(this, SettingsActivity.class));
 			return true;
 		}
 		return false;
@@ -162,14 +220,19 @@ public class ExerciseList extends ListActivity {
 	
 	@Override
     protected void onListItemClick(ListView l, View v, int position, long id) { 
-		CardioExercise exercise = allExercises.get(position);
+		Exercise exercise = displayExercises.get(position);
 		logExercise(exercise);
+	}
+	
+	public void selectFilter(CharSequence title) {
+		this.filter = title.toString();
+		displayExercises();
 	}
 	
 	@Override
 	public boolean onContextItemSelected(MenuItem item) {
 	    AdapterContextMenuInfo info = (AdapterContextMenuInfo) item.getMenuInfo();
-	    CardioExercise selectedExercise = ((ExerciseAdapter) getListAdapter()).getItem(info.position);
+	    Exercise selectedExercise = ((ExerciseAdapter) getListAdapter()).getItem(info.position);
 	    
 	    switch(item.getItemId()) {
 	    	case R.id.logContextMenu :
@@ -202,7 +265,7 @@ public class ExerciseList extends ListActivity {
 			if (resultCode == RESULT_OK) {
 				Bundle extras = intent.getExtras();
 				if (extras != null) {
-					CardioExercise newExercise = (CardioExercise) extras.getSerializable("newExercise");
+					Exercise newExercise = (Exercise) extras.getSerializable("newExercise");
 					addExercise(newExercise);
 				}
 			}
@@ -210,15 +273,15 @@ public class ExerciseList extends ListActivity {
 			if(resultCode == RESULT_OK) {
 				Bundle extras = intent.getExtras();
 				if (extras != null) {
-					CardioExercise editedExercise = (CardioExercise) extras.getSerializable("newExercise");
+					Exercise editedExercise = (Exercise) extras.getSerializable("newExercise");
 					modifyExercise(editedExercise);
 				}
 			}
 		}
 	}
 
-	private void modifyExercise(CardioExercise editedExercise) {
-		for(CardioExercise exercise: allExercises) {
+	private void modifyExercise(Exercise editedExercise) {
+		for(Exercise exercise: allExercises) {
 			if(exercise.name.equals(editedExercise.name)) {
 				//Modify the existing one, because there might be handles to it elsewhere
 				exercise.copyFrom(editedExercise);
@@ -229,7 +292,7 @@ public class ExerciseList extends ListActivity {
 		}
 	}	
 
-	protected void markFavorite(CardioExercise exercise, boolean favorite) {
+	private void markFavorite(Exercise exercise, boolean favorite) {
 		if(favorite != exercise.favorite) {
 			exercise.favorite = favorite;
 			dirty = true;
@@ -237,7 +300,7 @@ public class ExerciseList extends ListActivity {
 		}
 	}
 	
-	private void addExercise(CardioExercise newExercise) {
+	private void addExercise(Exercise newExercise) {
 		int copyVal = 1;
 		String originalName = newExercise.name;
 		while(exercisesContain(newExercise)) {
@@ -250,8 +313,8 @@ public class ExerciseList extends ListActivity {
 		saveExercises();
 	}
 	
-	private boolean exercisesContain(CardioExercise exercise) {
-		for(CardioExercise ce: allExercises) {
+	private boolean exercisesContain(Exercise exercise) {
+		for(Exercise ce: allExercises) {
 			if(ce.name.equals(exercise.name)) {
 				return true;
 			}
@@ -259,13 +322,13 @@ public class ExerciseList extends ListActivity {
 		return false;
 	}
 	
-	private void logExercise(CardioExercise exercise) {
+	private void logExercise(Exercise exercise) {
 		Intent intent = new Intent(ExerciseList.this, LogActivity.class);
 		intent.putExtra("exercise", exercise);
 		startActivity(intent);
 	}
 	
-	private void deleteExercise(final CardioExercise exercise) {
+	private void deleteExercise(final Exercise exercise) {
 		AlertDialog.Builder builder = new AlertDialog.Builder(this);
 		builder.setMessage(Html.fromHtml("Are you sure you want to delete '"+StringEscapeUtils.escapeHtml3(exercise.name)+"'? <br/><small>(Note: this will not delete any logs)</small>"))
 		       .setCancelable(false)
@@ -304,10 +367,10 @@ public class ExerciseList extends ListActivity {
 		dirty = false;
 	}
 
-	private static class ExerciseAdapter extends ArrayAdapter<CardioExercise> {
+	private static class ExerciseAdapter extends ArrayAdapter<Exercise> {
 		Context mContext;
 		
-		public ExerciseAdapter(Context context, int layout, int resId, List<CardioExercise> items) {
+		public ExerciseAdapter(Context context, int layout, int resId, List<Exercise> items) {
 			super(context, layout, resId, items);
 			mContext = context;
 		}
@@ -318,12 +381,12 @@ public class ExerciseList extends ListActivity {
 			if (row == null) {
 				row = LayoutInflater.from(getContext()).inflate(R.layout.list_exercises, parent, false);
 			}
-			final CardioExercise item = getItem(position);
+			final Exercise item = getItem(position);
 			ExerciseList act = (ExerciseList)mContext;
 			TextView text = (TextView) row.findViewById(R.id.line1);
 			text.setText(item.name);
 			
-			if(act.doneExercices.contains(item.name)) {
+			if(act.doneExercises.contains(item.name)) {
 				row.findViewById(R.id.doneCheckMarkView).setVisibility(View.VISIBLE);
 			} else {
 				row.findViewById(R.id.doneCheckMarkView).setVisibility(View.GONE);
@@ -346,7 +409,25 @@ public class ExerciseList extends ListActivity {
 	}
 	
 	private void displayExercises() {		
+		String title="";
+		
+		displayExercises.clear();
+		if (this.filter == null || this.filter.equals("All")) {
+			displayExercises.addAll(allExercises);
+			title = getResources().getString(R.string.title_exercise_list);
+		} else if(filter.equals("Favorites")) {
+			for (Exercise exercise : allExercises) {
+				if (exercise.favorite) displayExercises.add(exercise);
+			}
+			title = filter;
+		}
+		
 		this.exerciseAdapter.notifyDataSetChanged();
+		
+		TextView spinnerBox = (TextView) findViewById(R.id.ab_basemaps_title);
+		if(spinnerBox!=null) {
+			spinnerBox.setText(title);
+		}
 		
 		if(allExercises.size() == 0 && loaded) {
 			findViewById(R.id.noExercisesView).setVisibility(View.VISIBLE);
@@ -356,14 +437,11 @@ public class ExerciseList extends ListActivity {
 
 	}
 
-	private static class LoadListData extends AsyncTask<LoadListData.Input, Void, LoadListData.Output> {
-		public static class Input {
-			
-		}
+	private static class LoadListData extends AsyncTask<Void, Void, LoadListData.Output> {		
 		
 		public static class Output {
 			public Set<String> doneExercices;
-			public ArrayList<CardioExercise> allExercises;
+			public ArrayList<Exercise> allExercises;
 			public boolean dirty;
 		}
 		
@@ -379,8 +457,7 @@ public class ExerciseList extends ListActivity {
 		}
 
 		@Override
-		protected Output doInBackground(Input... params) {
-			//Input input = params[0];
+		protected Output doInBackground(Void... params) {
 			Output output = new Output();
 			
 			loadCurrentWorkout(output);
@@ -392,8 +469,8 @@ public class ExerciseList extends ListActivity {
 		private void loadExerciseList(Output output) {
 			File file = Util.getExerciseFile(act.getApplicationContext());
 			Gson gson = new GsonBuilder().setPrettyPrinting().create();
-			Type collectionType = new TypeToken<Collection<CardioExercise>>() {}.getType();
-			List<CardioExercise> exercisesRead = new ArrayList<CardioExercise>();
+			Type collectionType = new TypeToken<Collection<Exercise>>() {}.getType();
+			List<Exercise> exercisesRead = new ArrayList<Exercise>();
 			String json;
 			try {
 				json = FileUtils.readFileToString(file, "UTF-8");
@@ -407,7 +484,7 @@ public class ExerciseList extends ListActivity {
 			}
 			
 			Collections.sort(exercisesRead);
-			output.allExercises = new ArrayList<CardioExercise>(exercisesRead);
+			output.allExercises = new ArrayList<Exercise>(exercisesRead);
 		}
 		
 		private void loadCurrentWorkout(Output output) {
@@ -416,12 +493,12 @@ public class ExerciseList extends ListActivity {
 			File currentLogFile = new File(dir, today+".json");
 			if(currentLogFile.exists()) {
 				Gson gson = new GsonBuilder().setPrettyPrinting().create();
-				Type collectionType = new TypeToken<Collection<CardioLogEntry>>() {}.getType();
+				Type collectionType = new TypeToken<Collection<LogEntry>>() {}.getType();
 				try {
 					String json = FileUtils.readFileToString(currentLogFile, "UTF-8");
-					List<CardioLogEntry> logs = gson.fromJson(json,collectionType);
+					List<LogEntry> logs = gson.fromJson(json,collectionType);
 					Set<String> currentExerciseSet = new HashSet<String>();
-					for(CardioLogEntry entry: logs) {
+					for(LogEntry entry: logs) {
 						currentExerciseSet.add(entry.exercise);
 					}
 					output.doneExercices = currentExerciseSet;
@@ -443,7 +520,7 @@ public class ExerciseList extends ListActivity {
 		loaded = true;
 		
 		if(result.doneExercices!= null) {
-			doneExercices = result.doneExercices;
+			doneExercises = result.doneExercices;
 		}
 		
 		if(result.dirty) {
@@ -454,8 +531,65 @@ public class ExerciseList extends ListActivity {
 			allExercises.clear();
 			allExercises.addAll(result.allExercises);
 		}
+		
+		exerciseAdapter.notifyDataSetChanged();
+		displayExercises();
 		findViewById(R.id.linlaHeaderProgress).setVisibility(View.GONE);
 		getListView().setVisibility(View.VISIBLE);
 	}	
+	
+	private static class ActionBarNavigationAdapter extends BaseAdapter {
+
+		Context context;
+		ArrayList<String> data;
+		LayoutInflater inflater;
+
+		public ActionBarNavigationAdapter(Context context, ArrayList<String> data) {
+			this.data = data;
+			inflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+			this.context = context;	
+		}
+
+		@Override
+		public View getView(int position, View convertView, ViewGroup parent) {
+
+			View actionBarView = inflater.inflate(R.layout.ab_main_view, null);
+			TextView title = (TextView) actionBarView.findViewById(R.id.ab_basemaps_title);
+			
+			if(position == 0) {
+				title.setText(context.getResources().getString(R.string.title_exercise_list));
+			} else {
+				title.setText(data.get(position));
+			}
+			return actionBarView;
+
+		}
+
+		@Override
+		public View getDropDownView(int position, View convertView, ViewGroup parent) {
+			View actionBarDropDownView = inflater.inflate(R.layout.ab_dropdown_view, null);
+			TextView dropDownTitle = (TextView) actionBarDropDownView.findViewById(R.id.ab_basemaps_dropdown_title);
+
+			dropDownTitle.setText(data.get(position));
+
+			return actionBarDropDownView;
+		}
+
+		@Override
+		public int getCount() {
+			return data.size();
+		}
+
+		@Override
+		public Object getItem(int position) {
+			return data.get(position);
+		}
+
+		@Override
+		public long getItemId(int position) {
+			return 0;
+		}
+
+	}
 
 }

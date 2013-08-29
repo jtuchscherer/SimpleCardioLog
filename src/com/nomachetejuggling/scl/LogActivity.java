@@ -6,10 +6,8 @@ import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -18,17 +16,13 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.joda.time.LocalDate;
 import org.joda.time.LocalTime;
-import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
-import org.joda.time.format.PeriodFormatter;
-import org.joda.time.format.PeriodFormatterBuilder;
 
 import android.app.ActionBar;
 import android.app.Activity;
 import android.os.AsyncTask;
-import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.app.NavUtils;
 import android.text.Html;
@@ -36,6 +30,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AbsListView.OnScrollListener;
 import android.widget.Button;
 import android.widget.NumberPicker;
 import android.widget.NumberPicker.OnValueChangeListener;
@@ -46,125 +41,233 @@ import android.widget.Toast;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
-import com.nomachetejuggling.scl.model.CardioExercise;
-import com.nomachetejuggling.scl.model.CardioLogEntry;
+import com.nomachetejuggling.scl.model.Exercise;
+import com.nomachetejuggling.scl.model.LogEntry;
 
-public class LogActivity extends Activity {
-	private static final int REGRESSION_POINTS = 3;
-	
-	private Map<LocalDate, List<CardioLogEntry>> logs;
-	private CardioExercise currentExercise;
+public class LogActivity extends Activity implements OnValueChangeListener, NumberPicker.OnScrollListener, View.OnClickListener {
+	private static final BigDecimal CALORIE_INCREMENT = new BigDecimal("5");
+	private static final int CALORIE_MAX = 200;
+	private static final int MINUTES_MAX = 120;
+	private static final int UNIT_MAX = 250;
+	private static final int MIN_REGRESSION_POINTS = 2;
+	private static final int MAX_REGRESSION_POINTS = 10;
+
+	// Application State
+	private Map<LocalDate, List<LogEntry>> logs;
+	private Exercise currentExercise;
 	private boolean spinnersAlreadySet;
 	private boolean manuallySelectedCals;
 	private BigDecimal m;
 	private BigDecimal b;
-	
-	private static final Comparator<CardioLogEntry> ENTRY_COMPARATOR = new Comparator<CardioLogEntry>() {
-		@Override
-		public int compare(CardioLogEntry left, CardioLogEntry right) {
-			if(left.entryTime == null && right.entryTime == null) return 0;
-			if(left.entryTime == null) return 1;
-			if(right.entryTime == null) return -1;
-			return left.entryTime.compareTo(right.entryTime);
-		}				
-	};
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_log);
 		// Show the Up button in the action bar.
-		setupActionBar();
+		getActionBar().setDisplayHomeAsUpEnabled(true);
+		ActionBar ab = getActionBar();
 
-		currentExercise = (CardioExercise) getIntent().getExtras().getSerializable("exercise");
+		// Application State Setup
+		currentExercise = (Exercise) getIntent().getExtras().getSerializable("exercise");
+		logs = new HashMap<LocalDate, List<LogEntry>>();
 
-		logs = new HashMap<LocalDate, List<CardioLogEntry>>();
-		
-		if(savedInstanceState!= null && savedInstanceState.containsKey("ManuallySelectedCals")) {
+		ab.setTitle(currentExercise.name);
+
+		if (savedInstanceState != null && savedInstanceState.containsKey("ManuallySelectedCals")) {
 			manuallySelectedCals = savedInstanceState.getBoolean("ManuallySelectedCals");
 		} else {
-			manuallySelectedCals = false;			
+			manuallySelectedCals = false;
 		}
 
-		OnValueChangeListener onValueChangeListener = new OnValueChangeListener() {
-			@Override
-			public void onValueChange(NumberPicker arg0, int arg1, int arg2) {
-				showCurrentLogs();
-			}
-		};
-		
-		OnValueChangeListener regressionChangeListener = new OnValueChangeListener() {
-
-			@Override
-			public void onValueChange(NumberPicker arg0, int arg1, int arg2) {
-				
-				if(m!=null && b != null && !manuallySelectedCals) { 
-					CardioLogEntry currentEntry = currentEntry();
-					BigDecimal x;
-					if(currentExercise.isUnitless()) {
-						x = new BigDecimal(currentEntry.minutes);
-					} else {
-						x = currentEntry.units;
-					}
-					BigDecimal calorieEstimate = m.multiply(x).add(b);
-					int pickerVal = calorieEstimate.divide(new BigDecimal(5), 0, RoundingMode.HALF_UP).intValue() -1;
-					NumberPicker picker = (NumberPicker) findViewById(R.id.caloriesPicker);
-					picker.setValue(pickerVal);
-				}
-			
-				
-				showCurrentLogs();
-			}
-			
-		};
-
 		NumberPicker minutesPicker = (NumberPicker) findViewById(R.id.minutesPicker);
-		setPickerRange(minutesPicker, 1, 120, 1, BigDecimal.ONE);
+		setPickerRange(minutesPicker, 1, MINUTES_MAX, 1, BigDecimal.ONE);
+		minutesPicker.setOnValueChangedListener(this);
 
 		if (currentExercise.isUnitless()) {
 			findViewById(R.id.unitSelection).setVisibility(View.GONE);
-			minutesPicker.setOnValueChangedListener(regressionChangeListener);
+			minutesPicker.setOnScrollListener(this);
 		} else {
 			findViewById(R.id.unitSelection).setVisibility(View.VISIBLE);
-			minutesPicker.setOnValueChangedListener(onValueChangeListener);
 
 			TextView unitTextView = (TextView) findViewById(R.id.unitTextView);
 			unitTextView.setText(currentExercise.units);
 
 			NumberPicker unitPicker = (NumberPicker) findViewById(R.id.unitPicker);
 			BigDecimal increment = new BigDecimal(currentExercise.precision);
-			setPickerRange(unitPicker, 1, 250, 1, increment);
-			unitPicker.setOnValueChangedListener(regressionChangeListener);
+			setPickerRange(unitPicker, 1, UNIT_MAX, 1, increment);
+			unitPicker.setOnValueChangedListener(this);
+			unitPicker.setOnScrollListener(this);
 		}
 
 		NumberPicker caloriesPicker = (NumberPicker) findViewById(R.id.caloriesPicker);
-		setPickerRange(caloriesPicker, 1, 200, 1, new BigDecimal("5"));
+		setPickerRange(caloriesPicker, 1, CALORIE_MAX, 1, CALORIE_INCREMENT);
 		caloriesPicker.setOnValueChangedListener(new OnValueChangeListener() {
 
 			@Override
 			public void onValueChange(NumberPicker arg0, int arg1, int arg2) {
-				manuallySelectedCals=true;
+				manuallySelectedCals = true;
 				showCurrentLogs();
 			}
-			
+
 		});
 
-		File dir = Util.getLogStorageDir(getApplicationContext());
-		
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-			ActionBar ab = getActionBar();
-			ab.setTitle(currentExercise.name);
-		}
+		findViewById(R.id.saveButton).setOnClickListener(this);
+		findViewById(R.id.undoButton).setOnClickListener(this);
 
+		findViewById(R.id.buttonBar).setVisibility(View.INVISIBLE);
 		findViewById(R.id.logsScroll).setVisibility(View.INVISIBLE);
 		findViewById(R.id.logLoadProgress).setVisibility(View.VISIBLE);
 
-		LoadLogData.Input input = new LoadLogData.Input();
-		input.currentExercise = currentExercise;
-		input.dir = dir;
-		input.previousEntries = 5;
+		new LoadLogData(this, currentExercise, Util.getLogStorageDir(getApplicationContext()), MAX_REGRESSION_POINTS).execute();
+	}
 
-		new LoadLogData(this).execute(input);
+	@Override
+	public void onSaveInstanceState(Bundle savedInstanceState) {
+		super.onSaveInstanceState(savedInstanceState);
+
+		NumberPicker minutesPicker = (NumberPicker) findViewById(R.id.minutesPicker);
+		NumberPicker unitPicker = (NumberPicker) findViewById(R.id.unitPicker);
+		NumberPicker caloriesPicker = (NumberPicker) findViewById(R.id.caloriesPicker);
+
+		savedInstanceState.putInt("MinutesPickerPosition", minutesPicker.getValue());
+		savedInstanceState.putInt("UnitPickerPosition", unitPicker.getValue());
+		savedInstanceState.putInt("CaloriesPickerPosition", caloriesPicker.getValue());
+
+		savedInstanceState.putBoolean("ManuallySelectedCals", manuallySelectedCals);
+
+		Button undoButton = (Button) findViewById(R.id.undoButton);
+		savedInstanceState.putBoolean("UndoEnabled", undoButton.isEnabled());
+	}
+
+	@Override
+	public void onRestoreInstanceState(Bundle savedInstanceState) {
+		super.onRestoreInstanceState(savedInstanceState);
+
+		int minutesPickerPosition = savedInstanceState.getInt("MinutesPickerPosition");
+		int unitPickerPosition = savedInstanceState.getInt("UnitPickerPosition");
+		int caloriesPickerPosition = savedInstanceState.getInt("CaloriesPickerPosition");
+
+		NumberPicker minutesPicker = (NumberPicker) findViewById(R.id.minutesPicker);
+		NumberPicker unitPicker = (NumberPicker) findViewById(R.id.unitPicker);
+		NumberPicker caloriesPicker = (NumberPicker) findViewById(R.id.caloriesPicker);
+
+		minutesPicker.setValue(minutesPickerPosition);
+		unitPicker.setValue(unitPickerPosition);
+		caloriesPicker.setValue(caloriesPickerPosition);
+		spinnersAlreadySet = true;
+
+		manuallySelectedCals = savedInstanceState.getBoolean("ManuallySelectedCals");
+
+		Button undoButton = (Button) findViewById(R.id.undoButton);
+		undoButton.setEnabled(savedInstanceState.getBoolean("UndoEnabled"));
+	}
+
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		getMenuInflater().inflate(R.menu.log, menu);
+		return true;
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		switch (item.getItemId()) {
+		case android.R.id.home:
+			NavUtils.navigateUpFromSameTask(this);
+			return true;
+		}
+		return super.onOptionsItemSelected(item);
+	}
+
+	@Override
+	public void onValueChange(NumberPicker arg0, int arg1, int arg2) {
+		showCurrentLogs();
+	}
+
+	@Override
+	public void onScrollStateChange(NumberPicker view, int scrollState) {
+		if (scrollState == OnScrollListener.SCROLL_STATE_IDLE && m != null && b != null && !manuallySelectedCals) {
+			LogEntry currentEntry = currentEntry();
+			BigDecimal x;
+			if (currentExercise.isUnitless()) {
+				x = new BigDecimal(currentEntry.minutes);
+			} else {
+				x = currentEntry.units;
+			}
+			BigDecimal calorieEstimate = m.multiply(x).add(b);
+			int pickerVal = calorieEstimate.divide(new BigDecimal(5), 0, RoundingMode.HALF_UP).intValue() - 1;
+			NumberPicker picker = (NumberPicker) findViewById(R.id.caloriesPicker);
+			picker.setValue(pickerVal);
+		}
+
+	}
+
+	@Override
+	public void onClick(View view) {
+		switch (view.getId()) {
+		case R.id.saveButton:
+			clickLogSet(view);
+			return;
+		case R.id.undoButton:
+			clickUndo(view);
+			return;
+		}
+	}
+
+	protected void loadCurrentLogs(LoadLogData.Output output) {
+		if (output.logs != null) {
+			logs.clear();
+			logs.putAll(output.logs);
+		}
+
+		if (!spinnersAlreadySet) {
+			List<LogEntry> previous = Util.getPreviousLogs(logs, currentExercise, 1);
+
+			if (previous.size() > 0) {
+				LogEntry lastEntry = previous.get(0);
+				int minutesPosition = lastEntry.minutes - 1;
+				int caloriesPosition = (lastEntry.calories / 5) - 1;
+
+				NumberPicker minutesPicker = (NumberPicker) findViewById(R.id.minutesPicker);
+				NumberPicker caloriesPicker = (NumberPicker) findViewById(R.id.caloriesPicker);
+				minutesPicker.setValue(minutesPosition);
+				caloriesPicker.setValue(caloriesPosition);
+
+				if (!currentExercise.isUnitless()) {
+					int unitsPosition = lastEntry.units.divide(new BigDecimal(currentExercise.precision)).intValue() - 1;
+					NumberPicker unitPicker = (NumberPicker) findViewById(R.id.unitPicker);
+					unitPicker.setValue(unitsPosition);
+				}
+			}
+		}
+
+		this.b = output.b;
+		this.m = output.m;
+
+		this.showCurrentLogs();
+		findViewById(R.id.buttonBar).setVisibility(View.VISIBLE);
+		findViewById(R.id.logsScroll).setVisibility(View.VISIBLE);
+		findViewById(R.id.logLoadProgress).setVisibility(View.GONE);
+	}
+	
+	private void clickLogSet(View view) {
+		LogEntry log = currentEntry();
+		getTodaysLogs().add(log);
+
+		Button undoButton = (Button) findViewById(R.id.undoButton);
+		undoButton.setEnabled(true);
+
+		this.manuallySelectedCals = false; // Reset this once something has been entered
+		this.persistCurrentLogs();
+	}
+
+	private void clickUndo(View view) {
+		Button undoButton = (Button) findViewById(R.id.undoButton);
+		undoButton.setEnabled(false);
+
+		List<LogEntry> todaysLogs = getTodaysLogs();
+		todaysLogs.remove(todaysLogs.size() - 1);
+		this.persistCurrentLogs();
 	}
 
 	private void setPickerRange(NumberPicker picker, int low, int high, int current, BigDecimal increment) {
@@ -180,47 +283,13 @@ public class LogActivity extends Activity {
 
 	}
 
-	private void setupActionBar() {
-
-		getActionBar().setDisplayHomeAsUpEnabled(true);
-
-	}
-
-	public void clickLogSet(View view) {
-		CardioLogEntry log = currentEntry();
-		getTodaysLogs().add(log);
-
-		Button undoButton = (Button) findViewById(R.id.undoButton);
-		undoButton.setEnabled(true);
-
-		this.manuallySelectedCals = false;  //Reset this once something has been entered
-		this.persistCurrentLogs();
-	}
-
-	public List<CardioLogEntry> getTodaysLogs() {
-		LocalDate today = new LocalDate();
-		if (!logs.containsKey(today)) {
-			logs.put(today, new ArrayList<CardioLogEntry>());
-		}
-		return logs.get(today);
-	}
-
-	public void clickUndo(View view) {
-		Button undoButton = (Button) findViewById(R.id.undoButton);
-		undoButton.setEnabled(false);
-
-		List<CardioLogEntry> todaysLogs = getTodaysLogs();
-		todaysLogs.remove(todaysLogs.size() - 1);
-		this.persistCurrentLogs();
-	}
-
 	private void persistCurrentLogs() {
 		File dir = Util.getLogStorageDir(this.getApplicationContext());
 		File file = new File(dir, new LocalDate().toString("yyyy-MM-dd") + ".json");
 		Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
 		String json = gson.toJson(getTodaysLogs());
-		Log.d("IO", "Writing to " + file.getAbsolutePath() + "\n" + json);
+		Log.d(Tags.IO, "Writing to " + file.getAbsolutePath() + "\n" + json);
 		try {
 			FileUtils.write(file, json, "UTF-8");
 		} catch (IOException e) {
@@ -232,113 +301,52 @@ public class LogActivity extends Activity {
 
 	private void showCurrentLogs() {
 		StringBuilder sb = builderForLogs(logs);
-		
-		CardioLogEntry currentEntry = currentEntry();
 
-		int currentTextColor=getResources().getColor(R.color.currentLogEntry);
+		LogEntry currentEntry = currentEntry();
+
+		int currentTextColor = getResources().getColor(R.color.currentLogEntry);
 		String hexColor = String.format("#%06X", (0xFFFFFF & currentTextColor));
-		
-		sb.append("<font color='"+hexColor+"'><i>" + formatEntry("Next", currentEntry)+ "</i></font>");
 
-		
+		sb.append("<font color='" + hexColor + "'><i>" + formatEntry("Next", currentEntry) + "</i></font>");
+
 		TextView currentLogs = (TextView) findViewById(R.id.logsView);
 		currentLogs.setText(Html.fromHtml(sb.toString()));
 
-		final ScrollView scrollView = (ScrollView) findViewById(R.id.logsScroll);
-		scrollView.post(new Runnable() {
-			@Override
-			public void run() {
-				scrollView.fullScroll(ScrollView.FOCUS_DOWN);
-			}
-		});
+		Util.scrollToBottom((ScrollView) findViewById(R.id.logsScroll));
 
 	}
-	
-	@Override
-	public void onSaveInstanceState(Bundle savedInstanceState) {
-		super.onSaveInstanceState(savedInstanceState);
 
-		NumberPicker minutesPicker = (NumberPicker) findViewById(R.id.minutesPicker);
-		NumberPicker unitPicker = (NumberPicker) findViewById(R.id.unitPicker);
-		NumberPicker caloriesPicker = (NumberPicker) findViewById(R.id.caloriesPicker);
-
-		savedInstanceState.putInt("MinutesPickerPosition", minutesPicker.getValue());
-		savedInstanceState.putInt("UnitPickerPosition", unitPicker.getValue());
-		savedInstanceState.putInt("CaloriesPickerPosition", caloriesPicker.getValue());
-		
-		savedInstanceState.putBoolean("ManuallySelectedCals", manuallySelectedCals);
-		
-		Button undoButton = (Button) findViewById(R.id.undoButton);
-		savedInstanceState.putBoolean("UndoEnabled", undoButton.isEnabled());
-	}
-
-	@Override
-	public void onRestoreInstanceState(Bundle savedInstanceState) {
-		super.onRestoreInstanceState(savedInstanceState);
-		
-		int minutesPickerPosition = savedInstanceState.getInt("MinutesPickerPosition");
-		int unitPickerPosition = savedInstanceState.getInt("UnitPickerPosition");
-		int caloriesPickerPosition = savedInstanceState.getInt("CaloriesPickerPosition");
-
-		NumberPicker minutesPicker = (NumberPicker) findViewById(R.id.minutesPicker);
-		NumberPicker unitPicker = (NumberPicker) findViewById(R.id.unitPicker);
-		NumberPicker caloriesPicker = (NumberPicker) findViewById(R.id.caloriesPicker);
-
-		minutesPicker.setValue(minutesPickerPosition);
-		unitPicker.setValue(unitPickerPosition);
-		caloriesPicker.setValue(caloriesPickerPosition);
-		spinnersAlreadySet = true;
-		
-		manuallySelectedCals = savedInstanceState.getBoolean("ManuallySelectedCals");
-		
-		Button undoButton = (Button) findViewById(R.id.undoButton);
-		undoButton.setEnabled(savedInstanceState.getBoolean("UndoEnabled"));
-	}
-
-	private String formatEntry(String date, CardioLogEntry entry) {
-		Period period = Period.minutes(entry.minutes).normalizedStandard();
-		PeriodFormatter periodFormatter = new PeriodFormatterBuilder().printZeroNever().appendHours().appendSuffix("hr").printZeroNever().appendMinutes().appendSuffix("min").toFormatter();
-
-		String periodFormatted = period.toString(periodFormatter);
-
+	private String formatEntry(String date, LogEntry entry) {
 		StringBuilder sb = new StringBuilder();
-		sb.append(date+": ");
-
-		if (entry.units == null) {
-			sb.append("<b>" + periodFormatted + "</b>");
-		} else {
-			sb.append("<b>" + entry.units + " " + currentExercise.units.toLowerCase(Locale.getDefault()) + " in " + periodFormatted + "</b>");
-		}
-
-		sb.append(" (" + entry.calories + " cal)");
-		sb.append("<br/>");
-
+		sb.append(date + ": ");
+		sb.append(entry.formatAsHtml(currentExercise.units.toLowerCase(Locale.getDefault())));
 		return sb.toString();
 	}
 
-	private StringBuilder builderForLogs(Map<LocalDate, List<CardioLogEntry>> logs) {
+	private StringBuilder builderForLogs(Map<LocalDate, List<LogEntry>> logs) {
 		List<LocalDate> dates = new ArrayList<LocalDate>();
 		dates.addAll(logs.keySet());
 		Collections.sort(dates);
-		
+
 		StringBuilder sb = new StringBuilder();
-		
+
 		LocalDate today = new LocalDate();
-		
-		for(LocalDate date: dates) {
-			List<CardioLogEntry> dateLogs = logs.get(date);
-			Collections.sort(dateLogs, ENTRY_COMPARATOR);
+
+		for (LocalDate date : dates) {
+			List<LogEntry> dateLogs = logs.get(date);
+			Collections.sort(dateLogs);
 			String dateFormatted = Util.getRelativeDate(today, date);
-			for (CardioLogEntry logEntry: dateLogs) {
+			for (LogEntry logEntry : dateLogs) {
 				if (logEntry.exercise.equals(currentExercise.name)) {
 					sb.append(formatEntry(dateFormatted, logEntry));
+					sb.append("<br/>");
 				}
 			}
 		}
 		return sb;
 	}
 
-	private CardioLogEntry currentEntry() {
+	private LogEntry currentEntry() {
 		NumberPicker minutesPicker = (NumberPicker) findViewById(R.id.minutesPicker);
 		NumberPicker unitPicker = (NumberPicker) findViewById(R.id.unitPicker);
 		NumberPicker caloriesPicker = (NumberPicker) findViewById(R.id.caloriesPicker);
@@ -349,7 +357,7 @@ public class LogActivity extends Activity {
 			units = precision.multiply(new BigDecimal(unitPicker.getValue() + 1));
 		}
 
-		CardioLogEntry log = new CardioLogEntry();
+		LogEntry log = new LogEntry();
 		log.entryTime = new LocalTime().toString(ISODateTimeFormat.time());
 		log.exercise = currentExercise.name;
 		log.units = units;
@@ -358,149 +366,99 @@ public class LogActivity extends Activity {
 		return log;
 	}
 
-	@Override
-	public boolean onCreateOptionsMenu(Menu menu) {
-		// Inflate the menu; this adds items to the action bar if it is present.
-		getMenuInflater().inflate(R.menu.log, menu);
-		return true;
+	private List<LogEntry> getTodaysLogs() {
+		LocalDate today = new LocalDate();
+		if (!logs.containsKey(today)) {
+			logs.put(today, new ArrayList<LogEntry>());
+		}
+		return logs.get(today);
 	}
 
-	@Override
-	public boolean onOptionsItemSelected(MenuItem item) {
-		switch (item.getItemId()) {
-		case android.R.id.home:
-			NavUtils.navigateUpFromSameTask(this);
-			return true;
-		}
-		return super.onOptionsItemSelected(item);
-	}
-
-	private static class LoadLogData extends AsyncTask<LoadLogData.Input, Void, LoadLogData.Output> {
-		public static class Input {
-			CardioExercise currentExercise;
-			File dir;
-			int previousEntries;
-		}
-
-		public static class Output {
-			Map<LocalDate, List<CardioLogEntry>> logs = new HashMap<LocalDate, List<CardioLogEntry>>();
-		}
+	private static class LoadLogData extends AsyncTask<Void, Void, LoadLogData.Output> {
 
 		private LogActivity act;
+		private Exercise currentExercise;
+		private File dir;
+		private int previousEntries;
 
-		public LoadLogData(LogActivity act) {
+		public static class Output {
+			Map<LocalDate, List<LogEntry>> logs = new HashMap<LocalDate, List<LogEntry>>();
+			BigDecimal b;
+			BigDecimal m;
+		}
+
+		public LoadLogData(LogActivity act, Exercise currentExercise, File dir, int previousEntries) {
 			this.act = act;
+			this.currentExercise = currentExercise;
+			this.dir = dir;
+			this.previousEntries = previousEntries;
 		}
 
 		@Override
-		protected void onPreExecute() {
-			super.onPreExecute();
-		}
-
-		@Override
-		protected Output doInBackground(Input... params) {
-			Input input = params[0];
+		protected Output doInBackground(Void... params) {
 
 			Output output = new Output();
-
-			CardioExercise currentExercise = input.currentExercise;
-			File dir = input.dir;
 
 			LocalDate today = new LocalDate();
 			String todayFormatted = today.toString("yyyy-MM-dd");
 
 			try {
-				File[] files = dir.listFiles();
-
-				Arrays.sort(files, new Comparator<File>() {
-					public int compare(File f1, File f2) {
-						return f2.getName().compareTo(f1.getName());
-					}
-				});
+				File[] files = Util.reverseSortedFilesIn(dir);
 
 				Gson gson = new GsonBuilder().setPrettyPrinting().create();
-				Type collectionType = new TypeToken<Collection<CardioLogEntry>>() {}.getType();
+				Type collectionType = new TypeToken<Collection<LogEntry>>() {
+				}.getType();
 				DateTimeFormatter pattern = DateTimeFormat.forPattern("yyyy-MM-dd");
 
-				output.logs = new HashMap<LocalDate, List<CardioLogEntry>>();
+				output.logs = new HashMap<LocalDate, List<LogEntry>>();
 
 				int trackedEntries = 0;
 
-				for (int i = 0; i < 50 && i < files.length && trackedEntries < input.previousEntries; i++) {
-					File file = files[i];					
+				for (int i = 0; i < 50 && i < files.length && trackedEntries < previousEntries; i++) {
+					File file = files[i];
 					String json = FileUtils.readFileToString(file, "UTF-8");
-					List<CardioLogEntry> logs = gson.fromJson(json, collectionType);
-					if (file.getName().equals(todayFormatted + ".json")) { //Always include today in the output, since we'll be rewriting it out
+					List<LogEntry> logs = gson.fromJson(json, collectionType);
+					if (file.getName().equals(todayFormatted + ".json")) { // Always include today in the output, we'll be rewriting it
 						output.logs.put(today, logs);
 					} else {
-						for (CardioLogEntry entry : logs) { //Only return relevant entries, to save memory
+						for (LogEntry entry : logs) { // Only return relevant entries, to save memory
 							if (entry.exercise.equals(currentExercise.name)) {
 								trackedEntries++;
 								LocalDate logDate = LocalDate.parse(file.getName().substring(0, 10), pattern);
 								if (!output.logs.containsKey(logDate)) {
-									output.logs.put(logDate, new ArrayList<CardioLogEntry>());
+									output.logs.put(logDate, new ArrayList<LogEntry>());
 								}
-								List<CardioLogEntry> entries = output.logs.get(logDate);
+								List<LogEntry> entries = output.logs.get(logDate);
 								entries.add(entry);
 							}
 						}
 					}
 				}
 
+				List<LogEntry> previous = Util.getPreviousLogs(output.logs, currentExercise, MAX_REGRESSION_POINTS);
+
+				if (previous.size() >= MIN_REGRESSION_POINTS) {
+					calculateLinearRegression(output, currentExercise, previous);
+				}
+
 				return output;
 			} catch (IOException e) {
-				Log.e("IO", "Problem", e);
+				Log.e(Tags.IO, "Problem", e);
 				return new Output();
 			}
 
 		}
 
-		@Override
-		protected void onPostExecute(Output output) {
-			super.onPostExecute(output);
-			act.loadCurrentLogs(output);
-		}
-
-	}
-
-	public void loadCurrentLogs(LoadLogData.Output output) {
-		if (output.logs != null) {
-			logs.clear();
-			logs.putAll(output.logs);
-		}
-
-		List<CardioLogEntry> previous = getPreviousLogs(REGRESSION_POINTS);
-		
-		if (!spinnersAlreadySet) {
-				
-			if (previous.size() > 0) {
-				CardioLogEntry lastEntry = previous.get(0);
-				int minutesPosition = lastEntry.minutes - 1;
-				int caloriesPosition = (lastEntry.calories / 5) - 1;
-
-				NumberPicker minutesPicker = (NumberPicker) findViewById(R.id.minutesPicker);
-				NumberPicker caloriesPicker = (NumberPicker) findViewById(R.id.caloriesPicker);
-				minutesPicker.setValue(minutesPosition);
-				caloriesPicker.setValue(caloriesPosition);
-				
-				if(!currentExercise.isUnitless()) {
-					int unitsPosition = lastEntry.units.divide(new BigDecimal(currentExercise.precision)).intValue() - 1;
-					NumberPicker unitPicker = (NumberPicker) findViewById(R.id.unitPicker);
-					unitPicker.setValue(unitsPosition);
-				}
-			}
-		}
-			
-			if(previous.size() == REGRESSION_POINTS) {
-				//Calculate linear regression
+		private void calculateLinearRegression(Output output, Exercise currentExercise, List<LogEntry> previous) {
+			try {
 				BigDecimal xSum = BigDecimal.ZERO;
 				BigDecimal ySum = BigDecimal.ZERO;
 				BigDecimal xySum = BigDecimal.ZERO;
 				BigDecimal x2Sum = BigDecimal.ZERO;
 				BigDecimal y2Sum = BigDecimal.ZERO;
-				for(CardioLogEntry log: previous) {
+				for (LogEntry log : previous) {
 					BigDecimal x;
-					if(currentExercise.isUnitless()) {
+					if (currentExercise.isUnitless()) {
 						x = new BigDecimal(log.minutes);
 					} else {
 						x = log.units;
@@ -512,47 +470,26 @@ public class LogActivity extends Activity {
 					x2Sum = x2Sum.add(x.multiply(x));
 					y2Sum = y2Sum.add(y.multiply(y));
 				}
-				BigDecimal n = new BigDecimal(REGRESSION_POINTS);
+				BigDecimal n = new BigDecimal(previous.size());
 				BigDecimal mNumer = n.multiply(xySum).subtract(xSum.multiply(ySum));
 				BigDecimal mDenom = n.multiply(x2Sum).subtract(xSum.multiply(xSum));
-				if(mDenom.equals(BigDecimal.ZERO)) {
-					this.m = null;
-				} else {
-					this.m = mNumer.divide(mDenom, 10, RoundingMode.FLOOR);
-				}
-				
+				output.m = mNumer.divide(mDenom, 10, RoundingMode.FLOOR);
+
 				BigDecimal bNumer = x2Sum.multiply(ySum).subtract(xSum.multiply(xySum));
 				BigDecimal bDenom = n.multiply(x2Sum).subtract(xSum.multiply(xSum));
-				if(bDenom.equals(BigDecimal.ZERO)) {
-					this.b = null;
-				} else {
-					this.b = bNumer.divide(bDenom, 10, RoundingMode.FLOOR);
-				}
-			}
-	
-		this.showCurrentLogs();
-		findViewById(R.id.logsScroll).setVisibility(View.VISIBLE);
-		findViewById(R.id.logLoadProgress).setVisibility(View.GONE);
-	}
-
-	private List<CardioLogEntry> getPreviousLogs(int howMany) {
-		List<CardioLogEntry> previousLogs = new ArrayList<CardioLogEntry>();
-		
-		List<LocalDate> dates = new ArrayList<LocalDate>();
-		dates.addAll(logs.keySet());
-		Collections.sort(dates);
-					
-		for(int i=dates.size()-1; i>=0 && previousLogs.size() < howMany; i--) {
-			List<CardioLogEntry> dateLogs = logs.get(dates.get(i));
-			Collections.sort(dateLogs, ENTRY_COMPARATOR);
-			for (int j = dateLogs.size() - 1; j >= 0 && previousLogs.size() < howMany; j--) {
-				CardioLogEntry entry = dateLogs.get(j);
-				if (entry.exercise.equals(currentExercise.name)) {
-					previousLogs.add(entry);
-				}
+				output.b = bNumer.divide(bDenom, 10, RoundingMode.FLOOR);
+			} catch (ArithmeticException e) { // Division by zero
+				output.m = null;
+				output.b = null;
 			}
 		}
-		return previousLogs;
+
+		@Override
+		protected void onPostExecute(Output output) {
+			super.onPostExecute(output);
+			act.loadCurrentLogs(output);
+		}
+
 	}
 
 }

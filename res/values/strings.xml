@@ -3,30 +3,20 @@
 
     <string name="app_name">Simple Cardio Log</string>
     <string name="action_settings">Settings</string>
-    <string name="hello_world">Hello world!</string>
     <string name="add_exercise">Add Exercise</string>
     <string name="random_exercise">Random Exercise</string>
     <string name="title_activity_add">Add Exercise</string>
     <string name="title_activity_settings">Settings</string>
-    <string name="exerciseNameLabel">Name:</string>
     <string name="saveButton">Save</string>
     <string name="save_exercise">Save</string>
     <string name="empty_exercise_list">No exercises found</string>
     <string name="error_cannot_save_exercises">Unable to save exercises, SD card not mounted or unwritable.</string>
     <string name="error_cannot_save_units">Unable to save units data, SD card not mounted or unwritable.</string>
     <string name="error_cannot_save_log">Unable to save log, SD card not mounted or unwritable.</string>
-    <string name="title_exercise_list">Simple Strength Log</string>
+    <string name="title_exercise_list">Simple Cardio Log</string>
     <string name="title_activity_log">Log</string>
-    <string name="currentLogLabel">Today:</string>
-    <string name="previousLogLabel">Previously:</string>
-    <string name="restTimeLabel">Seconds between sets:</string>
-    <string name="restTimeDefault">90</string>
     <string name="undoButtonLabel">Undo</string>
-    <string name="saveAndRestButtonLabel">Save &amp; Return</string>
     <string name="exerciseNameHint">Exercise Name</string>
-    <string name="setTagsButton">Set Muscles</string>
-    <string name="title_activity_drop_down">DropDownActivity</string>    
-    <string name="menu_filter">Filter</string>
     <string name="context_menu_log">Log</string>
     <string name="context_menu_favorite">Favorite</string>
     <string name="context_menu_unfavorite">Unfavorite</string>
@@ -34,25 +24,28 @@
     <string name="context_menu_edit">Edit</string>
     <string name="addFavoriteCheckBoxLabel">Favorite</string>
     <string name="doneCheckMark">✓</string>
-    <string name="tab">\u0009</string>
-    <string name="okay">Ok</string>
-    
+    <string name="noExercisesTitle">No Exercises!</string>
+    <string name="noExercisesMessage">Sorry, no exercises to choose from at random</string>
+
     <string-array name="precision_array">
-        <item>.01</item>
-        <item>.1</item>
+        <item>0.01</item>
+        <item>0.05</item>
+        <item>0.1</item>
+        <item>0.5</item>
         <item>1</item>
+        <item>5</item>
         <item>10</item>
     </string-array>
-    
-        <string name="measurementUnitLabel">Measures Units</string>
-        <string name="measurementUnitlessLabel">Unitless</string>
-        <string name="measurementPrecisionLabel">Measurement Precision:</string>
-        <string name="measurementUnitsLabel">Measurement Units:</string>
-        <string name="save_log_entry">Save Entry</string>
-        <string name="minutes_label">Minutes</string>
-        <string name="minutesLabel">Minutes</string>
-        <string name="unitsLabelText">Units</string>
-        <string name="caloriesLabelText">Calories</string>
-        <string name="logsLabel">History:</string>
+
+    <string name="measurementUnitLabel">Measures Units</string>
+    <string name="measurementUnitlessLabel">Unitless</string>
+    <string name="measurementPrecisionLabel">Measurement Increment:</string>
+    <string name="measurementUnitsLabel">Measurement Units:</string>
+    <string name="save_log_entry">Save Entry</string>
+    <string name="minutes_label">Minutes</string>
+    <string name="minutesLabel">Minutes</string>
+    <string name="unitsLabelText">Units</string>
+    <string name="caloriesLabelText">Calories</string>
+    <string name="logsLabel">History:</string>
 
 </resources>

@@ -3,8 +3,10 @@ package com.nomachetejuggling.scl;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Type;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -21,11 +23,13 @@ import android.content.Context;
 import android.content.ContextWrapper;
 import android.os.Environment;
 import android.util.Log;
+import android.widget.ScrollView;
 import android.widget.Toast;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
+import com.nomachetejuggling.scl.model.Exercise;
+import com.nomachetejuggling.scl.model.LogEntry;
 
 public class Util {
 
@@ -33,7 +37,7 @@ public class Util {
 		File dir = Environment.getExternalStorageDirectory();
 		File myDir = new File(dir, "/SimpleHealthSuite/Cardio/Logs/");
 		if (!myDir.mkdirs()) {
-			Log.w("Util", "Directory not created");
+			Log.w(Tags.IO, "Directory not created");
 		}
 		return myDir;
 	}
@@ -42,7 +46,7 @@ public class Util {
 		File dir = Environment.getExternalStorageDirectory();
 		File myDir = new File(dir, "/SimpleHealthSuite/Cardio");
 		if (!myDir.mkdirs()) {
-			Log.w("Util", "Directory not created");
+			Log.w(Tags.IO, "Directory not created");
 		}
 		return new File(myDir, "exerciselist.json");
 	}
@@ -51,7 +55,7 @@ public class Util {
 		File dir = Environment.getExternalStorageDirectory();
 		File myDir = new File(dir, "/SimpleHealthSuite/Cardio");
 		if (!myDir.mkdirs()) {
-			Log.w("Util", "Directory not created");
+			Log.w(Tags.IO, "Directory not created");
 		}
 		return new File(myDir, "units.json");
 	}
@@ -135,6 +139,46 @@ public class Util {
 	    }
 	
 	    return (Activity) context;
+	}
+
+	public static File[] reverseSortedFilesIn(File dir) {
+		File[] files = dir.listFiles();
+	
+		Arrays.sort(files, new Comparator<File>() {
+			public int compare(File f1, File f2) {
+				return f2.getName().compareTo(f1.getName());
+			}
+		});
+		return files;
+	}
+
+	static List<LogEntry> getPreviousLogs(Map<LocalDate, List<LogEntry>> logs, Exercise currentExercise, int howMany) {
+		List<LogEntry> previousLogs = new ArrayList<LogEntry>();
+		
+		List<LocalDate> dates = new ArrayList<LocalDate>();
+		dates.addAll(logs.keySet());
+		Collections.sort(dates);
+					
+		for(int i=dates.size()-1; i>=0 && previousLogs.size() < howMany; i--) {
+			List<LogEntry> dateLogs = logs.get(dates.get(i));
+			Collections.sort(dateLogs);
+			for (int j = dateLogs.size() - 1; j >= 0 && previousLogs.size() < howMany; j--) {
+				LogEntry entry = dateLogs.get(j);
+				if (entry.exercise.equals(currentExercise.name)) {
+					previousLogs.add(entry);
+				}
+			}
+		}
+		return previousLogs;
+	}
+
+	public  static void scrollToBottom(final ScrollView scrollView) {
+		scrollView.post(new Runnable() {
+			@Override
+			public void run() {
+				scrollView.fullScroll(ScrollView.FOCUS_DOWN);
+			}
+		});
 	}
 
 }

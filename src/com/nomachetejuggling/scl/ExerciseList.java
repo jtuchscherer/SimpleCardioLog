@@ -52,11 +52,11 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.AdapterView.AdapterContextMenuInfo;
 
-//TODO: dropdown for filter/favorites
-//TODO: random uses displayExercises, not All
-//TODO: some kind of feature to see how many calories burned each day, a history.  useful here
-//TODO: proper display when no exercises present
-//TODO: default cardio file
+// Release 1.2:
+//TODO: "History" activity showing past workouts by day, each with activities and calories burned, with calorie total
+
+//Later Release
+//FUTURE: Integrate with RunKeeper API (better suited for Simple Health Suite app)
 
 public class ExerciseList extends ListActivity implements ActionBar.OnNavigationListener{
 
@@ -186,9 +186,9 @@ public class ExerciseList extends ListActivity implements ActionBar.OnNavigation
 			SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(this);
 			boolean randomIncludeDone = settings.getBoolean("randomIncludeDone", false);
 			if(randomIncludeDone) {
-				possibleExercises.addAll(allExercises);
+				possibleExercises.addAll(displayExercises);
 			} else {
-				for(Exercise exercise: allExercises) {
+				for(Exercise exercise: displayExercises) {
 					if(!doneExercises.contains(exercise.name)) {
 						possibleExercises.add(exercise);
 					}
@@ -429,7 +429,7 @@ public class ExerciseList extends ListActivity implements ActionBar.OnNavigation
 			spinnerBox.setText(title);
 		}
 		
-		if(allExercises.size() == 0 && loaded) {
+		if(displayExercises.size() == 0 && loaded) {
 			findViewById(R.id.noExercisesView).setVisibility(View.VISIBLE);
 		} else {
 			findViewById(R.id.noExercisesView).setVisibility(View.INVISIBLE); //Not GONE, we want it to take up space so that checking something off doesn't make the name wrap

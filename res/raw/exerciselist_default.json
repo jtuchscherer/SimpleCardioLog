@@ -1,8 +1,8 @@
 [
   {
-    "name": "Treadmill",
+    "name": "Treadmill Running",
     "units": "Miles",
-    "precision": 0.01
+    "precision": 0.05
   },
   {
     "name": "Elliptical",
@@ -20,7 +20,12 @@
     "precision": 0.01
   },
   {
-    "name": "Cycling",
+    "name": "Recumbent Bike",
+    "units": "Miles",
+    "precision": 0.1
+  },
+  {
+    "name": "Spinning",
     "units": "Miles",
     "precision": 0.1
   },
@@ -30,7 +35,17 @@
     "precision": 10
   },
   {
-    "name": "Walking"
+    "name": "Treadmill Walking",
+    "units": "Miles",
+    "precision": 0.01
+  },
+  {
+    "name": "Treadmill Hiking",
+    "units": "Miles",
+    "precision": 0.01
+  },
+  {
+    "name": "Yoga"
   }
 
 ]
